@@ -1,0 +1,32 @@
+services:
+  postgres-zfile:
+    image: postgres:15
+    container_name: postgres-zfile
+    env_file: config/.postgres-zfile
+    ports:
+      - "${POSTGRES_ZFILE_PORT}:5432"
+    volumes:
+      - postgres-zfile-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  zfile-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zfile-service
+    env_file: config/.zfile-service
+    ports:
+      - "${ZFILE_SERVICE_PORT}:8080"
+    depends_on:
+      postgres-zfile:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - ~/.m2:/root/.m2
+
+volumes:
+  postgres-zfile-data:
