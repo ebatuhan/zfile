@@ -1,6 +1,6 @@
 package com.batu.zfile.entity;
 
-public enum ItemType {
+public enum NodeType {
     FILE,
     FOLDER
 }
