@@ -6,6 +6,8 @@ spring:
     username: postgres
     password: postgres
   jpa:
+    hibernate:
+      ddl-auto: create
     show-sql: true
     properties:
       hibernate:
@@ -16,3 +18,14 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.orm.jdbc.bind: TRACE
+
+zfile:
+  storage:
+    minio:
+      endpoint: ${ZFILE_STORAGE_MINIO_ENDPOINT:http://127.0.0.1:9000}
+      public-endpoint: ${ZFILE_STORAGE_MINIO_PUBLIC_ENDPOINT:http://127.0.0.1:9000}
+      access-key: ${ZFILE_STORAGE_MINIO_ACCESS_KEY:minioadmin}
+      secret-key: ${ZFILE_STORAGE_MINIO_SECRET_KEY:minioadmin}
+      bucket: ${ZFILE_STORAGE_MINIO_BUCKET:zfile}
+      region: ${ZFILE_STORAGE_MINIO_REGION:us-east-1}
+      presigned-url-expiry-seconds: ${ZFILE_STORAGE_MINIO_PRESIGNED_URL_EXPIRY_SECONDS:3600}

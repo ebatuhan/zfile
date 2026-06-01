@@ -3,9 +3,11 @@ package com.batu.zfile.service;
 import java.util.UUID;
 
 import com.batu.zfile.dto.CreateFolderRequest;
+import com.batu.zfile.dto.FileDownloadResponse;
 import com.batu.zfile.dto.FileNodeChildrenResponse;
 import com.batu.zfile.dto.FileNodeResponse;
 import com.batu.zfile.dto.UpdateNodeRequest;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface FileNodeService {
 
@@ -15,7 +17,11 @@ public interface FileNodeService {
 
     FileNodeResponse getNode(UUID nodeId);
 
+    FileDownloadResponse downloadFile(UUID nodeId);
+
     FileNodeResponse createFolder(UUID parentId, CreateFolderRequest request);
+
+    FileNodeResponse uploadFile(UUID parentId, MultipartFile file);
 
     FileNodeResponse renameNode(UUID nodeId, UpdateNodeRequest request);
 

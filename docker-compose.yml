@@ -13,6 +13,22 @@ services:
       timeout: 5s
       retries: 5
 
+  minio-zfile:
+    image: minio/minio:latest
+    container_name: minio-zfile
+    env_file: config/.minio-zfile
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_ZFILE_API_PORT}:9000"
+      - "${MINIO_ZFILE_CONSOLE_PORT}:9001"
+    volumes:
+      - minio-zfile-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   zfile-service:
     build:
       context: .
@@ -24,9 +40,12 @@ services:
     depends_on:
       postgres-zfile:
         condition: service_healthy
+      minio-zfile:
+        condition: service_healthy
     volumes:
       - .:/app
       - ~/.m2:/root/.m2
 
 volumes:
   postgres-zfile-data:
+  minio-zfile-data:
