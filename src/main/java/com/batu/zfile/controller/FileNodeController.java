@@ -10,13 +10,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.batu.zfile.dto.CreateFolderRequest;
+import com.batu.zfile.dto.FileDownloadResponse;
 import com.batu.zfile.dto.FileNodeChildrenResponse;
 import com.batu.zfile.dto.FileNodeResponse;
 import com.batu.zfile.dto.UpdateNodeRequest;
 import com.batu.zfile.service.FileNodeService;
+
+//TODO handle ROOT folder case by NULLS
 
 @RestController
 @RequestMapping("/api/nodes")
@@ -29,33 +34,53 @@ public class FileNodeController {
     }
 
     @GetMapping("/children")
-    public FileNodeChildrenResponse getRootChildren() {
-        return fileNodeService.getRootChildren();
+    public ResponseEntity<FileNodeChildrenResponse> getRootChildren() {
+        return ResponseEntity.ok(fileNodeService.getRootChildren());
     }
 
     @GetMapping("/{parentId}/children")
-    public FileNodeChildrenResponse getChildren(@PathVariable UUID parentId) {
-        return fileNodeService.getChildren(parentId);
+    public ResponseEntity<FileNodeChildrenResponse> getChildren(@PathVariable UUID parentId) {
+        return ResponseEntity.ok(fileNodeService.getChildren(parentId));
     }
 
     @GetMapping("/{nodeId}")
-    public FileNodeResponse getNode(@PathVariable UUID nodeId) {
-        return fileNodeService.getNode(nodeId);
+    public ResponseEntity<FileNodeResponse> getNode(@PathVariable UUID nodeId) {
+        return ResponseEntity.ok(fileNodeService.getNode(nodeId));
+    }
+
+    @GetMapping("/{nodeId}/content")
+    public ResponseEntity<FileDownloadResponse> downloadFile(@PathVariable UUID nodeId) {
+        return ResponseEntity.ok(fileNodeService.downloadFile(nodeId));
     }
 
     @PostMapping("/{parentId}/folders")
-    public FileNodeResponse createFolder(@PathVariable UUID parentId, @RequestBody CreateFolderRequest request) {
-        return fileNodeService.createFolder(parentId, request);
+    public ResponseEntity<FileNodeResponse> createFolder(@PathVariable UUID parentId, @RequestBody CreateFolderRequest request) {
+        return ResponseEntity.ok(fileNodeService.createFolder(parentId, request));
+    }
+
+    @PostMapping("/folders")
+    public ResponseEntity<FileNodeResponse> createRootFolder(@RequestBody CreateFolderRequest request) {
+        return ResponseEntity.ok(fileNodeService.createFolder(null, request));
+    }
+
+    @PostMapping("/files")
+    public ResponseEntity<FileNodeResponse> uploadRootFile(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(fileNodeService.uploadFile(null, file));
+    }
+
+    @PostMapping("/{parentId}/files")
+    public ResponseEntity<FileNodeResponse> uploadFile(@PathVariable UUID parentId, @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(fileNodeService.uploadFile(parentId, file));
     }
 
     @PatchMapping("/{nodeId}/name")
-    public FileNodeResponse renameNode(@PathVariable UUID nodeId, @RequestBody UpdateNodeRequest request) {
-        return fileNodeService.renameNode(nodeId, request);
+    public ResponseEntity<FileNodeResponse> renameNode(@PathVariable UUID nodeId, @RequestBody UpdateNodeRequest request) {
+        return ResponseEntity.ok(fileNodeService.renameNode(nodeId, request));
     }
 
     @PatchMapping("/{nodeId}/parent")
-    public FileNodeResponse moveNode(@PathVariable UUID nodeId, @RequestBody UpdateNodeRequest request) {
-        return fileNodeService.moveNode(nodeId, request);
+    public ResponseEntity<FileNodeResponse> moveNode(@PathVariable UUID nodeId, @RequestBody UpdateNodeRequest request) {
+        return ResponseEntity.ok(fileNodeService.moveNode(nodeId, request));
     }
 
     @DeleteMapping("/{nodeId}")
