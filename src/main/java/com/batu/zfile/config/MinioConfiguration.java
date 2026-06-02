@@ -1,5 +1,7 @@
 package com.batu.zfile.config;
 
+import java.util.List;
+
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -39,18 +41,20 @@ public class MinioConfiguration {
 
         public MinioBucketInitializer {
             try {
-                var exists = minioClient.bucketExists(BucketExistsArgs.builder()
-                        .bucket(properties.bucket())
-                        .build());
-
-                if (!exists) {
-                    minioClient.makeBucket(MakeBucketArgs.builder()
-                            .bucket(properties.bucket())
-                            .region(properties.region())
+                for (var bucket : List.of(properties.fileBucket(), properties.thumbnailBucket())) {
+                    var exists = minioClient.bucketExists(BucketExistsArgs.builder()
+                            .bucket(bucket)
                             .build());
+
+                    if (!exists) {
+                        minioClient.makeBucket(MakeBucketArgs.builder()
+                                .bucket(bucket)
+                                .region(properties.region())
+                                .build());
+                    }
                 }
             } catch (Exception exception) {
-                throw new IllegalStateException("Failed to initialize MinIO bucket", exception);
+                throw new IllegalStateException("Failed to initialize MinIO buckets", exception);
             }
         }
     }

@@ -3,9 +3,10 @@ package com.batu.zfile.service.impl;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.stereotype.Service;
 
 import com.batu.zfile.dto.CreateFolderRequest;
 import com.batu.zfile.dto.FileDownloadResponse;
@@ -13,12 +14,17 @@ import com.batu.zfile.dto.FileNodeChildrenResponse;
 import com.batu.zfile.dto.FileNodeResponse;
 import com.batu.zfile.dto.UpdateNodeRequest;
 import com.batu.zfile.dto.converter.FileNodeConverter;
+import com.batu.zfile.entity.FileMetadata;
 import com.batu.zfile.entity.FileNode;
 import com.batu.zfile.entity.NodeType;
+import com.batu.zfile.entity.ThumbnailStatus;
+import com.batu.zfile.event.FileUploaded;
 import com.batu.zfile.repository.FileNodeRepository;
 import com.batu.zfile.repository.PendingObjectDeletionRepository;
 import com.batu.zfile.service.FileNodeService;
+import com.batu.zfile.service.ObjectBucket;
 import com.batu.zfile.service.ObjectStorageService;
+import com.batu.zfile.service.ThumbnailService;
 
 import jakarta.persistence.EntityNotFoundException;
 
@@ -28,25 +34,38 @@ public class FileNodeServiceImpl implements FileNodeService {
     private final FileNodeRepository fileNodeRepository;
     private final PendingObjectDeletionRepository pendingObjectDeletionRepository;
     private final ObjectStorageService objectStorageService;
+    private final ThumbnailService thumbnailService;
     private final FileNodeConverter fileNodeConverter;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public FileNodeServiceImpl(
             FileNodeRepository fileNodeRepository,
             PendingObjectDeletionRepository pendingObjectDeletionRepository,
             ObjectStorageService objectStorageService,
-            FileNodeConverter fileNodeConverter) {
+            ThumbnailService thumbnailService,
+            FileNodeConverter fileNodeConverter,
+            ApplicationEventPublisher applicationEventPublisher) {
         this.fileNodeRepository = fileNodeRepository;
         this.pendingObjectDeletionRepository = pendingObjectDeletionRepository;
         this.objectStorageService = objectStorageService;
+        this.thumbnailService = thumbnailService;
         this.fileNodeConverter = fileNodeConverter;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
     @Transactional(readOnly = true)
     public FileNodeChildrenResponse getRootChildren() {
-        var children = fileNodeRepository.findByParentIsNullOrderByTypeAscNameAsc()
+        var childNodes = fileNodeRepository.findByParentIsNullOrderByTypeAscNameAsc();
+        var thumbnailUrls = thumbnailService.getThumbnailUrls(childNodes.stream()
+                .map(FileNode::getMetadata)
+                .filter(metadata -> metadata != null)
+                .toList());
+        var children = childNodes
                 .stream()
-                .map(fileNodeConverter::toResponse)
+                .map(node -> fileNodeConverter.toResponse(
+                        node,
+                        node.getMetadata() == null ? null : thumbnailUrls.get(node.getMetadata().getFileMetadataId())))
                 .toList();
 
         return new FileNodeChildrenResponse(null, List.of(), children);
@@ -66,9 +85,16 @@ public class FileNodeServiceImpl implements FileNodeService {
                 .stream()
                 .map(fileNodeConverter::toPathSegmentResponse)
                 .toList();
-        var children = fileNodeRepository.findByParent_FileNodeIdOrderByTypeAscNameAsc(parentId)
+        var childNodes = fileNodeRepository.findByParent_FileNodeIdOrderByTypeAscNameAsc(parentId);
+        var childThumbnailUrls = thumbnailService.getThumbnailUrls(childNodes.stream()
+                .map(FileNode::getMetadata)
+                .filter(metadata -> metadata != null)
+                .toList());
+        var children = childNodes
                 .stream()
-                .map(fileNodeConverter::toResponse)
+                .map(node -> fileNodeConverter.toResponse(
+                        node,
+                        node.getMetadata() == null ? null : childThumbnailUrls.get(node.getMetadata().getFileMetadataId())))
                 .toList();
 
         return new FileNodeChildrenResponse(fileNodeConverter.toResponse(current), path, children);
@@ -77,9 +103,13 @@ public class FileNodeServiceImpl implements FileNodeService {
     @Override
     @Transactional(readOnly = true)
     public FileNodeResponse getNode(UUID nodeId) {
-        return fileNodeRepository.findWithMetadataById(nodeId)
-                .map(fileNodeConverter::toResponse)
+        var node = fileNodeRepository.findWithMetadataById(nodeId)
                 .orElseThrow(() -> new EntityNotFoundException("File node not found: " + nodeId));
+        var thumbnailUrls = thumbnailService.getThumbnailUrls(node.getMetadata() == null ? List.of() : List.of(node.getMetadata()));
+
+        return fileNodeConverter.toResponse(
+                node,
+                node.getMetadata() == null ? null : thumbnailUrls.get(node.getMetadata().getFileMetadataId()));
     }
 
     @Override
@@ -101,7 +131,7 @@ public class FileNodeServiceImpl implements FileNodeService {
                 node.getName(),
                 metadata.getSize(),
                 metadata.getContentType(),
-                objectStorageService.createDownloadUrl(metadata.getObjectKey()));
+                objectStorageService.createPresignedUrl(ObjectBucket.FILE, metadata.getObjectKey()));
     }
 
     @Override
@@ -153,9 +183,15 @@ public class FileNodeServiceImpl implements FileNodeService {
 
         var metadata = objectStorageService.upload(file);
         metadata.setNode(fileNode);
+        metadata.setThumbnail(thumbnailService.createFor(metadata));
         fileNode.setMetadata(metadata);
 
-        return fileNodeConverter.toResponse(fileNodeRepository.save(fileNode));
+        var savedNode = fileNodeRepository.save(fileNode);
+        if (savedNode.getMetadata().getThumbnail().getStatus() == ThumbnailStatus.PENDING) {
+            applicationEventPublisher.publishEvent(new FileUploaded(savedNode.getMetadata().getFileMetadataId()));
+        }
+
+        return fileNodeConverter.toResponse(savedNode);
     }
 
     @Override
@@ -170,7 +206,10 @@ public class FileNodeServiceImpl implements FileNodeService {
 
         node.setName(request.name().trim());
 
-        return fileNodeConverter.toResponse(node);
+        var thumbnailUrls = thumbnailService.getThumbnailUrls(node.getMetadata() == null ? List.of() : List.of(node.getMetadata()));
+        return fileNodeConverter.toResponse(
+                node,
+                node.getMetadata() == null ? null : thumbnailUrls.get(node.getMetadata().getFileMetadataId()));
     }
 
     @Override
@@ -199,7 +238,10 @@ public class FileNodeServiceImpl implements FileNodeService {
         }
 
         node.setParent(parent);
-        return fileNodeConverter.toResponse(node);
+        var thumbnailUrls = thumbnailService.getThumbnailUrls(node.getMetadata() == null ? List.of() : List.of(node.getMetadata()));
+        return fileNodeConverter.toResponse(
+                node,
+                node.getMetadata() == null ? null : thumbnailUrls.get(node.getMetadata().getFileMetadataId()));
     }
 
     @Override

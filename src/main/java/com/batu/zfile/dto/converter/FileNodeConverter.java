@@ -17,12 +17,17 @@ public class FileNodeConverter {
     }
 
     public FileNodeResponse toResponse(FileNode node) {
+        return toResponse(node, null);
+    }
+
+    public FileNodeResponse toResponse(FileNode node, String thumbnailUrl) {
         return new FileNodeResponse(
                 node.getFileNodeId(),
                 node.getParent() == null ? null : node.getParent().getFileNodeId(),
                 node.getType(),
                 node.getName(),
                 fileMetadataConverter.toResponse(node.getMetadata()),
+                thumbnailUrl,
                 node.getCreatedAt(),
                 node.getUpdatedAt());
     }
