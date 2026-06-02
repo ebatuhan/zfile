@@ -7,12 +7,14 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UuidGenerator;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
@@ -33,32 +35,29 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(indexes = {
-        @Index(name = "idx_file_metadata_file_node_id", columnList = "file_node_id", unique = true),
-        @Index(name = "idx_file_metadata_object_key", columnList = "object_key", unique = true)
+        @Index(name = "idx_thumbnail_file_metadata_id", columnList = "file_metadata_id", unique = true),
+        @Index(name = "idx_thumbnail_status", columnList = "status")
 })
-public class FileMetadata {
+public class Thumbnail {
 
     @Id
     @UuidGenerator
-    private UUID fileMetadataId;
+    private UUID thumbnailId;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "file_node_id", nullable = false)
+    @JoinColumn(name = "file_metadata_id", nullable = false, unique = true)
     @OnDelete(action = OnDeleteAction.CASCADE)
-    private FileNode node;
+    private FileMetadata metadata;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String objectKey;
-
-    @Column(nullable = false)
-    private Long size;
-
-    private String contentType;
-
-    @OneToOne(mappedBy = "metadata", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private Thumbnail thumbnail;
+    private ThumbnailStatus status;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private Instant updatedAt;
 }

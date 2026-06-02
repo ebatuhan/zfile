@@ -1,5 +1,6 @@
 package com.batu.zfile.service.impl;
 
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.UUID;
 
@@ -9,13 +10,14 @@ import org.springframework.web.multipart.MultipartFile;
 import com.batu.zfile.config.MinioProperties;
 import com.batu.zfile.entity.FileMetadata;
 import com.batu.zfile.exception.FileContentStorageException;
+import com.batu.zfile.service.ObjectBucket;
 import com.batu.zfile.service.ObjectStorageService;
 
 import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.GetObjectArgs;
 import io.minio.Http;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
-import io.minio.RemoveObjectArgs;
 import io.minio.RemoveObjectsArgs;
 import io.minio.messages.DeleteRequest;
 
@@ -41,7 +43,7 @@ public class MinioObjectStorageService implements ObjectStorageService {
 
         try {
             minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(minioProperties.bucket())
+                    .bucket(minioProperties.fileBucket())
                     .object(objectKey)
                     .stream(file.getInputStream(), file.getSize(), -1L)
                     .contentType(contentType)
@@ -58,33 +60,47 @@ public class MinioObjectStorageService implements ObjectStorageService {
     }
 
     @Override
-    public String createDownloadUrl(String objectKey) {
+    public InputStream read(ObjectBucket bucket, String objectKey) {
+        try {
+            return minioClient.getObject(GetObjectArgs.builder()
+                    .bucket(bucket == ObjectBucket.FILE ? minioProperties.fileBucket() : minioProperties.thumbnailBucket())
+                    .object(objectKey)
+                    .build());
+        } catch (Exception exception) {
+            throw new FileContentStorageException("Failed to read object content", exception);
+        }
+    }
+
+    @Override
+    public void upload(ObjectBucket bucket, String objectKey, InputStream content, long size, String contentType) {
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucket == ObjectBucket.FILE ? minioProperties.fileBucket() : minioProperties.thumbnailBucket())
+                    .object(objectKey)
+                    .stream(content, size, -1L)
+                    .contentType(contentType == null ? DEFAULT_CONTENT_TYPE : contentType)
+                    .build());
+        } catch (Exception exception) {
+            throw new FileContentStorageException("Failed to upload object content", exception);
+        }
+    }
+
+    @Override
+    public String createPresignedUrl(ObjectBucket bucket, String objectKey) {
         try {
             return publicMinioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(Http.Method.GET)
-                    .bucket(minioProperties.bucket())
+                    .bucket(bucket == ObjectBucket.FILE ? minioProperties.fileBucket() : minioProperties.thumbnailBucket())
                     .object(objectKey)
                     .expiry(minioProperties.presignedUrlExpirySeconds())
                     .build());
         } catch (Exception exception) {
-            throw new FileContentStorageException("Failed to create file download URL", exception);
+            throw new FileContentStorageException("Failed to create object URL", exception);
         }
     }
 
     @Override
-    public void delete(String objectKey) {
-        try {
-            minioClient.removeObject(RemoveObjectArgs.builder()
-                    .bucket(minioProperties.bucket())
-                    .object(objectKey)
-                    .build());
-        } catch (Exception exception) {
-            throw new FileContentStorageException("Failed to delete file content", exception);
-        }
-    }
-
-    @Override
-    public void deleteAll(Collection<String> objectKeys) {
+    public void deleteAll(ObjectBucket bucket, Collection<String> objectKeys) {
         if (objectKeys.isEmpty()) {
             return;
         }
@@ -95,18 +111,18 @@ public class MinioObjectStorageService implements ObjectStorageService {
 
         try {
             var results = minioClient.removeObjects(RemoveObjectsArgs.builder()
-                    .bucket(minioProperties.bucket())
+                    .bucket(bucket == ObjectBucket.FILE ? minioProperties.fileBucket() : minioProperties.thumbnailBucket())
                     .objects(objects)
                     .build());
 
             for (var result : results) {
                 var error = result.get();
-                throw new FileContentStorageException("Failed to delete file content: " + error.objectName(), null);
+                throw new FileContentStorageException("Failed to delete object content: " + error.objectName(), null);
             }
         } catch (FileContentStorageException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new FileContentStorageException("Failed to delete file contents", exception);
+            throw new FileContentStorageException("Failed to delete object contents", exception);
         }
     }
 }

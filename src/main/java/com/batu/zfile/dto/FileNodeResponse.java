@@ -11,6 +11,7 @@ public record FileNodeResponse(
         NodeType type,
         String name,
         FileMetadataResponse metadata,
+        String thumbnailUrl,
         Instant createdAt,
         Instant updatedAt) {
 }
