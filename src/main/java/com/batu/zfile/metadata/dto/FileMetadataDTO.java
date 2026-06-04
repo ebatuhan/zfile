@@ -2,8 +2,9 @@ package com.batu.zfile.metadata.dto;
 
 import java.util.UUID;
 
-public record FileMetadataResponseDTO(
+public record FileMetadataDTO(
     UUID fileMetadataId,
+    Long size,
     String contentType
 ) {
 
