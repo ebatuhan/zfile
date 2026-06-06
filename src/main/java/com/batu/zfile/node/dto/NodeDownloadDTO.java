@@ -1,5 +1,7 @@
 package com.batu.zfile.node.dto;
 
-public record NodeDownloadDTO(String presignedUrl) {
+import java.time.Instant;
+
+public record NodeDownloadDTO(String presignedUrl, Instant expiresAt) {
 
 }

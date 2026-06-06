@@ -20,6 +20,7 @@ public class NodeMapper {
         return new NodeDTO(node.getNodeId(),
                 node.getName(),
                 node.getType().toString(),
+                node.getMetadata().getThumbnail().getThumbnailId(),
                 node.getCreatedAt(),
                 node.getUpdatedAt());
     }

@@ -3,32 +3,40 @@ package com.batu.zfile.node;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.KeysetScrollPosition;
 import org.springframework.data.domain.Window;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.batu.zfile.common.CursorPageResponse;
 import com.batu.zfile.common.CursorUtils;
 import com.batu.zfile.common.ResourceNotFoundException;
+import com.batu.zfile.metadata.FileMetadata;
 import com.batu.zfile.node.dto.NodeDTO;
 import com.batu.zfile.node.dto.NodeDetailsDTO;
 import com.batu.zfile.node.dto.NodeDownloadDTO;
 import com.batu.zfile.node.dto.NodePathDTO;
 import com.batu.zfile.node.dto.NodeRequestDTO;
+import com.batu.zfile.node.event.NodeCreatedEvent;
 import com.batu.zfile.storage.ObjectStorageService;
+import com.batu.zfile.storage.PresignedUrl;
+import com.batu.zfile.storage.StoredObject;
 
 public class NodeServiceImpl implements NodeService {
 
     private final NodeRepository nodeRepository;
     private final ObjectStorageService objectStorageService;
+    private final ApplicationEventPublisher applicationEventPublisher;
     private final CursorUtils cursorUtils;
     private final NodeMapper nodeMapper;
     private final int PATH_MAX_DEPTH = 5;
 
     public NodeServiceImpl(NodeRepository nodeRepository, CursorUtils cursorUtils, NodeMapper nodeMapper,
-            ObjectStorageService objectStorageService) {
+            ObjectStorageService objectStorageService, ApplicationEventPublisher applicationEventPublisher) {
         this.nodeRepository = nodeRepository;
         this.objectStorageService = objectStorageService;
+        this.applicationEventPublisher = applicationEventPublisher;
         this.cursorUtils = cursorUtils;
         this.nodeMapper = nodeMapper;
     }
@@ -118,8 +126,84 @@ public class NodeServiceImpl implements NodeService {
 
         final String objectKey = node.getMetadata().getObjectKey();
 
-        final String presignedUrl = objectStorageService.getPresignedUrlByObjectKey(objectKey);
+        final PresignedUrl presignedUrl = objectStorageService.getFileLink(objectKey);
 
-        return new NodeDownloadDTO(presignedUrl);
+        return new NodeDownloadDTO(
+                presignedUrl.url(),
+                presignedUrl.expiresAt());
+    }
+
+    @Override
+    @Transactional
+    public NodeDTO createFileNode(UUID parentId, MultipartFile file) {
+
+        Node parentNode = null;
+
+        if (parentId != null) {
+            parentNode = nodeRepository.findById(parentId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent node not found."));
+        }
+
+        if (parentNode.getType() == NodeType.FOLDER) {
+            throw new IllegalStateException("Requested resource is not a folder.");
+        }
+
+        StoredObject storedFile = objectStorageService.storeFile(file);
+
+        FileMetadata fileMetadata = FileMetadata.builder()
+                .contentType(storedFile.mimeType())
+                .size(storedFile.sizeInBytes())
+                .objectKey(storedFile.objectKey())
+                .build();
+
+        Node fileNode = Node.builder()
+                .name(file.getName())
+                .parent(parentNode)
+                .metadata(fileMetadata)
+                .build();
+
+        Node savedNode = nodeRepository.save(fileNode);
+
+        applicationEventPublisher.publishEvent(new NodeCreatedEvent(savedNode.getNodeId()));
+
+        return nodeMapper.toNodeItemDto(savedNode);
+
+    }
+
+    @Override
+    @Transactional
+    public NodeDTO createFolderNode(NodeRequestDTO request) {
+
+        Node parentNode = null;
+
+        if (request.parentId() != null) {
+            parentNode = nodeRepository.findById(request.parentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent folder not found."));
+        }
+
+        if (parentNode.getType() == NodeType.FOLDER) {
+            throw new IllegalStateException("Requested resource is not a folder.");
+        }
+
+        Node folderNode = Node.builder()
+                .name(request.name())
+                .parent(parentNode)
+                .type(NodeType.FOLDER)
+                .build();
+
+        return nodeMapper.toNodeItemDto(folderNode);
+    }
+
+    @Override
+    @Transactional
+    public Node save(Node node) {
+        return nodeRepository.save(node);
+    }
+
+    @Override
+    @Transactional
+    public Node read(UUID nodeId) {
+        return nodeRepository.findById(nodeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Node not found."));
     }
 }

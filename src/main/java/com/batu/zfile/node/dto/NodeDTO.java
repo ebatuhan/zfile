@@ -7,6 +7,7 @@ public record NodeDTO(
     UUID nodeId,
     String nodeName,
     String nodeType,
+    UUID thumbnailId,
     Instant createdAt,
     Instant updatedAt
 ) {

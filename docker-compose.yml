@@ -37,6 +37,8 @@ services:
     env_file: config/.zfile-service
     ports:
       - "${ZFILE_SERVICE_PORT}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres-zfile:
         condition: service_healthy

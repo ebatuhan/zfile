@@ -1,4 +1,4 @@
-package com.batu.zfile.entity;
+package com.batu.zfile.cleanup;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -7,9 +7,12 @@ import org.hibernate.annotations.UuidGenerator;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import com.batu.zfile.storage.enums.BucketType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
@@ -35,6 +38,10 @@ public class PendingObjectDeletion {
 
     @Column(nullable = false)
     private String objectKey;
+
+    @Column
+    @Enumerated
+    private BucketType bucketType;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

@@ -23,7 +23,6 @@ zfile:
   storage:
     minio:
       endpoint: ${ZFILE_STORAGE_MINIO_ENDPOINT:http://127.0.0.1:9000}
-      public-endpoint: ${ZFILE_STORAGE_MINIO_PUBLIC_ENDPOINT:http://127.0.0.1:9000}
       access-key: ${ZFILE_STORAGE_MINIO_ACCESS_KEY:minioadmin}
       secret-key: ${ZFILE_STORAGE_MINIO_SECRET_KEY:minioadmin}
       file-bucket: ${ZFILE_STORAGE_MINIO_FILE_BUCKET:zfile}

@@ -9,8 +9,8 @@ import org.hibernate.annotations.UuidGenerator;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import com.batu.zfile.entity.Thumbnail;
 import com.batu.zfile.node.Node;
+import com.batu.zfile.thumbnail.Thumbnail;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -54,7 +54,7 @@ public class FileMetadata {
     private String objectKey;
 
     @Column(nullable = false)
-    private Long size;
+    private long size;
 
     private String contentType;
 

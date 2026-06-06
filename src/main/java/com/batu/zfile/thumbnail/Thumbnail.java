@@ -1,4 +1,4 @@
-package com.batu.zfile.entity;
+package com.batu.zfile.thumbnail;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -15,8 +15,7 @@ import com.batu.zfile.metadata.FileMetadata;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
@@ -51,9 +50,7 @@ public class Thumbnail {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private FileMetadata metadata;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private ThumbnailStatus status;
+    private String objectKey;
 
     @CreatedDate
     @Column(nullable = false, updatable = false)
